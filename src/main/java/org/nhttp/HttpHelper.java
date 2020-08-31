@@ -19,20 +19,27 @@ public class HttpHelper {
      * 缓存文件名称
      */
     private static final String CACHE_FILE = Paths.get("D:","NetCache").normalize().toString();
-
+    /**
+     * 临时存储目录
+     */
     private static final String TEMP_DIR = Paths.get("D:","NetTemp").normalize().toString();
     /**
-     * 默认缓存大小
+     * 默认缓存大小、超时时间（秒）
      */
     private static final int CACHE_SIZE = 100 * 1024 * 1024;
     private static final int CONNECT_TIMEOUT_SIZE = 10;
     private static final int WRITE_TIMEOUT_SIZE = 10;
     private static final int READ_TIMEOUT_SIZE = 30;
-
+    /**
+     * 下载文件缓冲区的大小
+     */
     private static final int DOWNLOAD_BUFFER_SIZE = 10 * 1024;
 
     private final OkHttpClient CLIENT;
 
+    /**
+     * 内部类实现单例，实现线程安全，延迟加载
+     */
     private static class InnerObject {
         private final static HttpHelper INSTANCE = new HttpHelper();
     }
@@ -197,6 +204,7 @@ public class HttpHelper {
                     }
             }
         } else {
+            // 非正常响应直接响应message
             builder.responseType(String.class)
                     .responseText(response.message());
             try {

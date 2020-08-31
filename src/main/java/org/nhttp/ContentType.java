@@ -1,7 +1,9 @@
 package org.nhttp;
 
 public interface ContentType {
-
+    /**
+     * contentType 类型
+     */
     String APPLICATION = "application";
 
     String TEXT = "text";
