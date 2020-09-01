@@ -1,6 +1,6 @@
 package io.bio;
 
-import com.io.utils.IOUtil;
+import io.utils.IOUtil;
 
 import java.io.IOException;
 import java.io.InputStream;

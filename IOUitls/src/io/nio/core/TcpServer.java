@@ -1,6 +1,6 @@
 package io.nio.core;
 
-import com.io.utils.IOUtil;
+import io.utils.IOUtil;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -126,7 +126,7 @@ public class TcpServer extends Thread implements Connector.OnClientStateChange{
     }
 
     public static void main(String[] args) {
-        new TcpServer(9090).start();
+        new TcpServer(10000).start();
     }
 
 

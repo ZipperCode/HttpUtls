@@ -1,6 +1,7 @@
 package io.bio;
 
-import com.io.utils.IOUtil;
+
+import io.utils.IOUtil;
 
 import java.io.*;
 import java.net.InetSocketAddress;
@@ -23,8 +24,8 @@ public class TcpClient {
 
     public static void main(String[] args) {
         try {
-            new TcpClient("localhost",9090).start();
-            new TcpClient("localhost",9090).start();
+            new TcpClient("localhost",10000).start();
+//            new TcpClient("localhost",9999).start();
             // 等待子线程结束
             Thread.currentThread().join();
         } catch (IOException | InterruptedException ioException) {

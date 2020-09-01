@@ -13,7 +13,7 @@ import java.util.Scanner;
 public class NioServer implements Runnable {
 
 	public static void main(String[] args) {
-		NioServer nioServer = new NioServer(9090);
+		NioServer nioServer = new NioServer(9999);
 		new Thread(nioServer).start();
 	}
 
@@ -48,20 +48,24 @@ public class NioServer implements Runnable {
 	@Override
 	public void run() {
 		try {
-			while (true){
-				if(mSelector.select(5) > 0){
+			while (!Thread.interrupted()){
+				if(mSelector.select() > 0){
 					Iterator<SelectionKey> selectionKeyIterator = mSelector.selectedKeys().iterator();
 					while (selectionKeyIterator.hasNext()){
 						SelectionKey selectionKey = selectionKeyIterator.next();
-						selectionKeyIterator.remove();
 						try{
 							if(selectionKey.isAcceptable()){
+								System.out.println("[Server] isAcceptable");
 								accept(selectionKey);
 							}else if(selectionKey.isReadable()){
+								System.out.println("[Server] isReadable");
 								read(selectionKey);
 							}else if(selectionKey.isWritable()){
+								System.out.println("[Server] isWritable");
 								write(selectionKey);
+
 							}
+							selectionKeyIterator.remove();
 						}catch (IOException e){
 							selectionKey.cancel();
 							throw e;
@@ -104,11 +108,12 @@ public class NioServer implements Runnable {
 		channel.read(mReadByteBuffer);
 		// 缓冲区游标归0
 		mReadByteBuffer.flip();
+		channel.configureBlocking(false);
 		// 将缓冲区数据写出显示
 		String printString = new String(mReadByteBuffer.array(),"UTF-8");
 		System.out.println("收到来自：" +channel.getRemoteAddress() + " 的数据：" +printString);
 		// 收到数据后注册写事件
-		channel.register(mSelector, SelectionKey.OP_READ);
+		channel.register(mSelector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 	}
 
 	private void write(SelectionKey key) throws IOException{
@@ -116,6 +121,7 @@ public class NioServer implements Runnable {
 		mWriteByteBuffer.clear();
 		SocketChannel channel = (SocketChannel) key.channel();
 		Scanner scanner = new Scanner(System.in);
+		System.out.print("请输入要发送到客户端的字符：");
 		String inputString = scanner.next();
 		mWriteByteBuffer.put(inputString.getBytes("UTF-8"));
 		// 游标归0
@@ -123,6 +129,6 @@ public class NioServer implements Runnable {
 		// 写数据
 		channel.write(mWriteByteBuffer);
 		// 注册读事件
-		channel.register(mSelector,SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+		channel.register(mSelector,SelectionKey.OP_WRITE | SelectionKey.OP_READ);
 	}
 }

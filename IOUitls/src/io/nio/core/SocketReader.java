@@ -1,6 +1,7 @@
 package io.nio.core;
 
-import com.io.utils.IOUtil;
+
+import io.utils.IOUtil;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -15,12 +16,21 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SocketReader extends Thread implements Closeable {
 
+    /**
+     * 选择器
+     */
     private Selector selector;
-
+    /**
+     * 是否被取消
+     */
     private final AtomicBoolean isCanceled = new AtomicBoolean(false);
-
+    /**
+     * 是否处于等待
+     */
     private final AtomicBoolean isWaiting = new AtomicBoolean(true);
-
+    /**
+     * 没一个连接对应他们的IO回调处理器
+     */
     private Map<SelectionKey, IProducer> map = new HashMap<>();
 
     private final IOHandler ioHandler;
@@ -35,24 +45,26 @@ public class SocketReader extends Thread implements Closeable {
     @Override
     public void run() {
         try {
-//            System.out.println("SocketReader 开始监听读事件");
+            System.out.println("SocketReader 开始监听读事件");
             while (!isCanceled.get()) {
 //                System.out.println("SocketReader 开始轮询是否有通道被选择");
-                boolean b = selector.select(1) == 0;
+                // 注册之后当前线程被阻塞
+                boolean b = selector.select() == 0;
                 System.out.println("b = " + b);
                 if (b) {
-//                    System.out.println("SocketReader Selector被唤醒，没有任何通道可用");
+                    System.out.println("SocketReader Selector被唤醒，没有任何通道可用");
                     ioHandler.onNone();
-                    waiting();
+//                    waiting();
                     continue;
                 }
-//                System.out.println("SocketReader 包含读的通道");
                 Iterator<SelectionKey> selectKeys = selector.selectedKeys().iterator();
                 while (selectKeys.hasNext()) {
                     SelectionKey selectionKey = selectKeys.next();
                     selectKeys.remove();
                     if (selectionKey.isReadable()) {
+                        System.out.println("SocketReader 包含读的通道");
 //                        System.out.println("监听到客户端数据可读，开始提交IO处理");
+                        // 取消事件注册
                         selectionKey.interestOps(selectionKey.readyOps() & ~ SelectionKey.OP_READ);
                         IProducer iProducer = map.get(selectionKey);
                         System.out.println("iProducer = " + iProducer);
@@ -82,7 +94,7 @@ public class SocketReader extends Thread implements Closeable {
                 socketChannel.configureBlocking(false);
                 if (socketChannel.isRegistered()) {
                     // 查询是否已经注册过
-//                    System.out.println(threadName + " : 查询是否已经注册过");
+                    System.out.println(threadName + " : 查询是否已经注册过");
                     selectionKey = socketChannel.keyFor(selector);
                     if (selectionKey != null) {
                         selectionKey.interestOps(0);
@@ -90,11 +102,15 @@ public class SocketReader extends Thread implements Closeable {
                     }
                 }
                 if(selectionKey == null){
+                    System.out.println(threadName + " : selectionKey 为空，注册读事件 添加到map中");
                     selectionKey = socketChannel.register(selector, SelectionKey.OP_READ);
                     map.put(selectionKey, producer);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
+            }finally {
+                // 唤醒Selector
+                selector.wakeup();
             }
         }
     }
@@ -159,7 +175,6 @@ public class SocketReader extends Thread implements Closeable {
                 channel.register(selector,SelectionKey.OP_READ);
                 // 唤醒selector
                 selector.wakeup();
-                starting();
             } catch (IOException ioException) {
                 ioException.printStackTrace();
             }
