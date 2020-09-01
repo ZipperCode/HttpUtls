@@ -19,7 +19,7 @@ public class SocketReader extends Thread implements Closeable {
     /**
      * 选择器
      */
-    private Selector selector;
+    private final Selector selector;
     /**
      * 是否被取消
      */
@@ -31,7 +31,7 @@ public class SocketReader extends Thread implements Closeable {
     /**
      * 没一个连接对应他们的IO回调处理器
      */
-    private Map<SelectionKey, IProducer> map = new HashMap<>();
+    private final Map<SelectionKey, IProducer> map = new HashMap<>();
 
     private final IOHandler ioHandler;
 
@@ -46,26 +46,23 @@ public class SocketReader extends Thread implements Closeable {
     public void run() {
         try {
             System.out.println("SocketReader 开始监听读事件");
-            while (!isCanceled.get()) {
-//                System.out.println("SocketReader 开始轮询是否有通道被选择");
-                // 注册之后当前线程被阻塞
-                boolean b = selector.select() == 0;
-                System.out.println("b = " + b);
-                if (b) {
+            while (!isCanceled.get() && !Thread.interrupted()) {
+                if (selector.select() == 0) {
                     System.out.println("SocketReader Selector被唤醒，没有任何通道可用");
                     ioHandler.onNone();
 //                    waiting();
                     continue;
                 }
                 Iterator<SelectionKey> selectKeys = selector.selectedKeys().iterator();
+                System.out.println("selectedKeys = "+selector.selectedKeys().size());
                 while (selectKeys.hasNext()) {
                     SelectionKey selectionKey = selectKeys.next();
-                    selectKeys.remove();
+                    // 当前线程只处理可读的事件
                     if (selectionKey.isReadable()) {
-                        System.out.println("SocketReader 包含读的通道");
-//                        System.out.println("监听到客户端数据可读，开始提交IO处理");
+                        selectKeys.remove();
+                        System.out.println("[Server][Reader] isReadable");
                         // 取消事件注册
-                        selectionKey.interestOps(selectionKey.readyOps() & ~ SelectionKey.OP_READ);
+                        // selectionKey.interestOps(selectionKey.readyOps() & ~SelectionKey.OP_READ);
                         IProducer iProducer = map.get(selectionKey);
                         System.out.println("iProducer = " + iProducer);
                         if (iProducer != null) {
@@ -86,8 +83,6 @@ public class SocketReader extends Thread implements Closeable {
         System.out.println(threadName + " : 开始注册读通道事件");
         // 获取isWaiting的锁
         synchronized (isWaiting) {
-            // 唤醒Selector
-            selector.wakeup();
             // 注册通道事件
             try {
                 SelectionKey selectionKey = null;
@@ -97,11 +92,10 @@ public class SocketReader extends Thread implements Closeable {
                     System.out.println(threadName + " : 查询是否已经注册过");
                     selectionKey = socketChannel.keyFor(selector);
                     if (selectionKey != null) {
-                        selectionKey.interestOps(0);
-                        selectionKey.channel().register(selector,SelectionKey.OP_READ);
+                        socketChannel.register(selector, SelectionKey.OP_READ);
                     }
                 }
-                if(selectionKey == null){
+                if (selectionKey == null) {
                     System.out.println(threadName + " : selectionKey 为空，注册读事件 添加到map中");
                     selectionKey = socketChannel.register(selector, SelectionKey.OP_READ);
                     map.put(selectionKey, producer);
@@ -109,7 +103,8 @@ public class SocketReader extends Thread implements Closeable {
             } catch (IOException e) {
                 e.printStackTrace();
             }finally {
-                // 唤醒Selector
+                // 每当有一个新连接后唤醒
+//                notifying();
                 selector.wakeup();
             }
         }
@@ -137,7 +132,7 @@ public class SocketReader extends Thread implements Closeable {
         }
     }
 
-    public void starting() {
+    public void notifying() {
         synchronized (isWaiting) {
             System.out.println("释放isWaiting锁");
             isWaiting.notifyAll();
@@ -172,9 +167,7 @@ public class SocketReader extends Thread implements Closeable {
                 // 消费事件
                 producer.produce(byteBuffer.array());
                 // 注册读事件
-                channel.register(selector,SelectionKey.OP_READ);
-                // 唤醒selector
-                selector.wakeup();
+                channel.register(selector, SelectionKey.OP_READ);
             } catch (IOException ioException) {
                 ioException.printStackTrace();
             }

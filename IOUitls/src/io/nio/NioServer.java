@@ -1,19 +1,18 @@
 package io.nio;
 
+import io.utils.IOUtil;
+
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.util.Iterator;
-import java.util.Scanner;
+import java.nio.channels.*;
+import java.util.*;
 
 public class NioServer implements Runnable {
 
 	public static void main(String[] args) {
-		NioServer nioServer = new NioServer(9999);
+		NioServer nioServer = new NioServer(10000);
 		new Thread(nioServer).start();
 	}
 
@@ -21,6 +20,10 @@ public class NioServer implements Runnable {
 	private Selector mSelector;
 	private ByteBuffer mReadByteBuffer = ByteBuffer.allocate(Short.MAX_VALUE);
 	private ByteBuffer mWriteByteBuffer = ByteBuffer.allocate(Short.MAX_VALUE);
+
+	private WriteHandler writeHandler = new WriteHandler();
+
+	private List<SocketChannel> socketChannelList = new ArrayList<>();
 
 	public NioServer(int port) {
 		this.mPort = port;
@@ -48,22 +51,23 @@ public class NioServer implements Runnable {
 	@Override
 	public void run() {
 		try {
+//			writeHandler.start();
 			while (!Thread.interrupted()){
 				if(mSelector.select() > 0){
 					Iterator<SelectionKey> selectionKeyIterator = mSelector.selectedKeys().iterator();
 					while (selectionKeyIterator.hasNext()){
 						SelectionKey selectionKey = selectionKeyIterator.next();
+						System.out.println("[Server] == > interestOps = " + selectionKey.interestOps());
 						try{
 							if(selectionKey.isAcceptable()){
-								System.out.println("[Server] isAcceptable");
+								System.out.println("[Server] isAcceptable " + selectionKey);
 								accept(selectionKey);
 							}else if(selectionKey.isReadable()){
-								System.out.println("[Server] isReadable");
+								System.out.println("[Server] isReadable " + selectionKey);
 								read(selectionKey);
 							}else if(selectionKey.isWritable()){
-								System.out.println("[Server] isWritable");
+								System.out.println("[Server] isWritable " + selectionKey);
 								write(selectionKey);
-
 							}
 							selectionKeyIterator.remove();
 						}catch (IOException e){
@@ -76,14 +80,7 @@ public class NioServer implements Runnable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
-			try {
-				if (mSelector != null) {
-					mSelector.close();
-				}
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-
+			IOUtil.close(mSelector);
 		}
 	}
 
@@ -98,6 +95,7 @@ public class NioServer implements Runnable {
 		socketChannel.configureBlocking(false);
 		// 注册读取事件
 		socketChannel.register(mSelector,SelectionKey.OP_READ);
+		socketChannelList.add(socketChannel);
 	}
 
 	private void read(SelectionKey key) throws IOException{
@@ -105,9 +103,12 @@ public class NioServer implements Runnable {
 		mReadByteBuffer.clear();
 		SocketChannel channel = (SocketChannel) key.channel();
 		// 读取数据到缓冲区
-		channel.read(mReadByteBuffer);
+		int size = channel.read(mReadByteBuffer);
 		// 缓冲区游标归0
 		mReadByteBuffer.flip();
+		System.out.println("position = " + mReadByteBuffer.position());
+		System.out.println("limit = " + mReadByteBuffer.limit());
+		System.out.println("remaining = " + mReadByteBuffer.remaining());
 		channel.configureBlocking(false);
 		// 将缓冲区数据写出显示
 		String printString = new String(mReadByteBuffer.array(),"UTF-8");
@@ -121,14 +122,39 @@ public class NioServer implements Runnable {
 		mWriteByteBuffer.clear();
 		SocketChannel channel = (SocketChannel) key.channel();
 		Scanner scanner = new Scanner(System.in);
-		System.out.print("请输入要发送到客户端的字符：");
-		String inputString = scanner.next();
-		mWriteByteBuffer.put(inputString.getBytes("UTF-8"));
-		// 游标归0
+		String text = scanner.nextLine();
+		mWriteByteBuffer.put(text.getBytes());
 		mWriteByteBuffer.flip();
 		// 写数据
 		channel.write(mWriteByteBuffer);
 		// 注册读事件
 		channel.register(mSelector,SelectionKey.OP_WRITE | SelectionKey.OP_READ);
+	}
+
+	private void write(String msg){
+		try {
+			mWriteByteBuffer.clear();
+			mWriteByteBuffer.put(msg.getBytes("UTF-8"));
+			mWriteByteBuffer.flip();
+			for (SocketChannel socketChannel : socketChannelList){
+				System.out.println("客户端socket注册写 " + socketChannel.keyFor(mSelector));
+				socketChannel.register(mSelector,SelectionKey.OP_WRITE);
+			}
+		} catch (ClosedChannelException | UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public class WriteHandler extends Thread{
+		@Override
+		public void run() {
+			super.run();
+			Scanner scanner = new Scanner(System.in);
+			while (!Thread.interrupted()){
+				System.out.print("请输入要发送到客户端的字符：");
+				String text = scanner.nextLine();
+				write(text);
+			}
+		}
 	}
 }

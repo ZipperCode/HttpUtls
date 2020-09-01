@@ -42,8 +42,18 @@ public class Connector implements Closeable,IProducer,ICustomer {
     }
 
     @Override
+    public void onProduceException(Exception e) {
+        IOUtil.close(this);
+    }
+
+    @Override
     public void consume(byte[] data) {
 
+    }
+
+    @Override
+    public void onCustomException(Exception e) {
+        IOUtil.close(this);
     }
 
 

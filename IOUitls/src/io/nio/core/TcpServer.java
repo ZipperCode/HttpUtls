@@ -4,15 +4,14 @@ import io.utils.IOUtil;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
-public class TcpServer extends Thread implements Connector.OnClientStateChange{
+public class TcpServer extends Thread implements Connector.OnClientStateChange {
     /**
      * 选择器，选择连接，读写通道
      */
@@ -46,7 +45,9 @@ public class TcpServer extends Thread implements Connector.OnClientStateChange{
      */
     private boolean isClosed = false;
 
-    public TcpServer(int port){
+    private Map<SelectionKey,Connector> clientMap = new HashMap();
+
+    public TcpServer(int port) {
         this.port = port;
         try {
             // 打开选择器
@@ -64,7 +65,7 @@ public class TcpServer extends Thread implements Connector.OnClientStateChange{
             // 读通道处理
             socketReader = new SocketReader(selector, ioHandler);
             // 写处理
-            socketWriter = new SocketWriter(selector,ioHandler);
+            socketWriter = new SocketWriter(selector, ioHandler);
             // 设置当前线程为最大优先级
             setPriority(Thread.MAX_PRIORITY);
         } catch (IOException e) {
@@ -75,23 +76,27 @@ public class TcpServer extends Thread implements Connector.OnClientStateChange{
     @Override
     public void run() {
         try {
-            socketReader.start();
-            socketWriter.start();
+//            socketReader.start();
+//            socketWriter.start();
             ioHandler.start();
             System.out.println("开始监听每一个连接");
-            while (!isClosed){
-                if(selector.select() > 0){
+            while (!isClosed) {
+                if (selector.select() > 0) {
                     Iterator<SelectionKey> selectionKeyIterator = selector.selectedKeys().iterator();
-                    while (selectionKeyIterator.hasNext()){
+                    while (selectionKeyIterator.hasNext()) {
                         SelectionKey selectionKey = selectionKeyIterator.next();
-//                        System.out.println("是否有可选的通道" + (selectionKey.readyOps() == SelectionKey.OP_READ));
                         selectionKeyIterator.remove();
-                        try{
-                            // 当前线程只处理连接
-                            if(selectionKey.isAcceptable()){
+                        try {
+                            if (selectionKey.isAcceptable()) {
+                                System.out.println("[Server] isAcceptable");
                                 accept(selectionKey);
+                            } else if (selectionKey.isReadable()) {
+                                System.out.println("[Server] isReadable");
+                                read(selectionKey);
+                            } else if (selectionKey.isWritable()) {
+
                             }
-                        }catch (IOException e){
+                        } catch (IOException e) {
                             selectionKey.cancel();
                             throw e;
                         }
@@ -101,11 +106,11 @@ public class TcpServer extends Thread implements Connector.OnClientStateChange{
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            IOUtil.close(serverSocketChannel,selector);
+            IOUtil.close(serverSocketChannel, selector);
         }
     }
 
-    private void accept(SelectionKey key) throws IOException{
+    private void accept(SelectionKey key) throws IOException {
         // 获取服务端注册的通道
         ServerSocketChannel serverSocketChannel = (ServerSocketChannel) key.channel();
         // 阻塞直到接受连接
@@ -113,9 +118,26 @@ public class TcpServer extends Thread implements Connector.OnClientStateChange{
         System.out.println("客户端：" + socketChannel.getRemoteAddress() + " 连接成功");
         // 设置非阻塞模式
         socketChannel.configureBlocking(false);
-//        socketChannel.register(selector,SelectionKey.OP_READ);
+        SelectionKey clientReadSelectionKey = socketChannel.register(selector, SelectionKey.OP_READ);
+        System.out.println("clientReadSelectionKey = " + clientReadSelectionKey);
+        // 同时注册读和写事件，Selector.select()会调用，isWritable()方法为true
+//        socketChannel.register(selector,SelectionKey.OP_READ | SelectionKey.OP_WRITE);
         // 每当有一个客户端连接后，创建一个客户端连接类
-        clients.add(new Connector(socketReader,socketWriter,socketChannel,this));
+        Connector connector = new Connector(socketReader, socketWriter, socketChannel, this);
+        clientMap.put(clientReadSelectionKey,connector);
+    }
+
+    private void read(SelectionKey key) throws IOException{
+        IProducer iProducer = clientMap.get(key);
+        System.out.println("iProducer = " + iProducer);
+        if (iProducer != null) {
+            key.interestOps(key.readyOps() & ~SelectionKey.OP_READ);
+            ioHandler.onTask(new ReadHandler(key,iProducer));
+        }
+    }
+
+    private void write(SelectionKey key) throws IOException{
+
     }
 
     @Override
@@ -124,6 +146,42 @@ public class TcpServer extends Thread implements Connector.OnClientStateChange{
         clients.remove(connector);
         System.out.println(clients);
     }
+
+    class ReadHandler implements Runnable {
+
+        private final SelectionKey selectionKey;
+
+        private IProducer producer;
+
+        private final ByteBuffer byteBuffer;
+
+        public ReadHandler(SelectionKey selectionKey, IProducer producer) {
+            this.selectionKey = selectionKey;
+            this.producer = producer;
+            this.byteBuffer = ByteBuffer.allocate(256);
+        }
+
+
+        @Override
+        public void run() {
+            try {
+                // 清除缓冲区数据
+                SocketChannel channel = (SocketChannel) selectionKey.channel();
+                // 读取数据到缓冲区
+                channel.read(byteBuffer);
+                // 缓冲区游标归0
+                byteBuffer.flip();
+                // 消费事件
+                producer.produce(byteBuffer.array());
+                // 注册读事件
+                channel.register(selector, SelectionKey.OP_READ);
+                selector.wakeup();
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
+        }
+    }
+
 
     public static void main(String[] args) {
         new TcpServer(10000).start();
