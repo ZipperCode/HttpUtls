@@ -8,6 +8,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class NioServer implements Runnable {
 
@@ -76,6 +77,7 @@ public class NioServer implements Runnable {
 						}
 					}
 				}
+				TimeUnit.SECONDS.sleep(1);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

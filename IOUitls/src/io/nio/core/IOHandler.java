@@ -40,7 +40,7 @@ public class IOHandler extends Thread {
             }
             Runnable poll = taskQueue.poll();
             if(poll != null && !runTaskExecutorService.isShutdown()){
-                System.out.println("开始执行任务 ： " + poll);
+//                System.out.println("开始执行任务 ： " + poll);
                 runTaskExecutorService.execute(poll);
             }
         }

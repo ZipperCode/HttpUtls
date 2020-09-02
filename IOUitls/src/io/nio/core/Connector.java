@@ -5,6 +5,7 @@ import io.utils.IOUtil;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
+import java.util.Scanner;
 
 public class Connector implements Closeable,IProducer,ICustomer {
 
@@ -25,7 +26,7 @@ public class Connector implements Closeable,IProducer,ICustomer {
         this.socketWriter = socketWriter;
         this.onClientStateChange = onClientStateChange;
         // 注册读事件
-        this.socketReader.register(socketChannel, this);
+//        this.socketReader.register(socketChannel, this);
     }
 
     @Override
@@ -47,8 +48,11 @@ public class Connector implements Closeable,IProducer,ICustomer {
     }
 
     @Override
-    public void consume(byte[] data) {
-
+    public byte[] consume() {
+        System.out.print("请输入您要发送到客户端的字符：");
+        Scanner scanner = new Scanner(System.in);
+        String text = scanner.nextLine();
+        return text.getBytes();
     }
 
     @Override
