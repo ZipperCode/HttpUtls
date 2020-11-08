@@ -60,14 +60,17 @@ public class DnsHeader {
         buffer.putShort(this.mAdditionalCount);
     }
 
-    /**
-     * ID偏移
-     */
+    /* ID偏移 */
     public static final short OFFSET_ID = 0;
+    /* 标志位偏移 */
     public static final short OFFSET_FLAGS = 2;
+    /* 问题数偏移 */
     public static final short OFFSET_QUESTION_COUNT = 4;
+    /* 回答数偏移 */
     public static final short OFFSET_ANSWER_COUNT = 6;
+    /* 授权数 */
     public static final short OFFSET_AUTHORITY_COUNT = 8;
+    /* 附加偏移 */
     public static final short OFFSET_ADDITIONAL_COUNT = 10;
 
     private ByteBuffer mData;
@@ -78,6 +81,7 @@ public class DnsHeader {
 
     public DnsHeader(byte[] data, int offset) {
         this.mData = ByteBuffer.wrap(data);
+
         this.mDataOffset = offset;
     }
 

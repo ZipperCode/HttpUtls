@@ -28,10 +28,11 @@ public class UdpClient implements Runnable {
     public UdpClient() {
         scanner = new Scanner(System.in);
         try {
-            byteBuffer = ByteBuffer.allocate(128);
+            byteBuffer = ByteBuffer.allocate(256);
             selector = Selector.open();
             datagramChannel = DatagramChannel.open();
-            SocketAddress sa = new InetSocketAddress("8.8.8.8", 53);
+//            SocketAddress sa = new InetSocketAddress("8.8.8.8", 53);
+            SocketAddress sa = new InetSocketAddress("114.114.114.114", 53);
             datagramChannel.configureBlocking(false);
             datagramChannel.socket().connect(sa);
         } catch (IOException e) {
@@ -83,7 +84,6 @@ public class UdpClient implements Runnable {
         dnsFlags.mRd = false;
         // 0 000 0 1 0 0 0000 0000
         // 0000 0100 0000 0000
-        System.out.println("dnsFlag = " + dnsFlags);
         dnsHeader.mTransactionId = ((short) 2354);
         dnsHeader.mDnsFlags = dnsFlags;
         dnsHeader.mQuestionCount = ((short) 1);
@@ -97,6 +97,8 @@ public class UdpClient implements Runnable {
         dnsPacket.toBytes(byteBuffer);
         System.out.println(IOUtil.byteHexToString(byteBuffer.array()));
         byteBuffer.flip();
+        System.out.println(DnsPacket.parseFromBuffer(byteBuffer));
+        byteBuffer.flip();
         channel.write(byteBuffer);
         channel.register(selector, SelectionKey.OP_READ);
     }
@@ -106,8 +108,9 @@ public class UdpClient implements Runnable {
         byteBuffer.clear();
         channel.read(byteBuffer);
         System.out.println("收到服务端消息：");
-        byteBuffer.limit(128);
-        DnsPacket dnsPacket = DnsPacket.fromBytes(byteBuffer);
+        byteBuffer.limit(256);
+        byteBuffer.flip();
+        DnsPacket dnsPacket = DnsPacket.parseFromBuffer(byteBuffer);
         System.out.println(dnsPacket);
         System.out.println(IOUtil.byteHexToString(byteBuffer.array()));
         channel.register(selector, SelectionKey.OP_WRITE);

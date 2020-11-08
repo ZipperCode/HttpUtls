@@ -67,8 +67,11 @@ public class Resource {
         return length;
     }
 
-    public static Resource fromBytes(ByteBuffer buffer) {
+    public Resource(){
 
+    }
+
+    public static Resource fromBytes(ByteBuffer buffer) {
         Resource r = new Resource();
         r.offset = buffer.arrayOffset() + buffer.position();
         r.mDomain = DnsPacket.readDomain(buffer, buffer.arrayOffset());
@@ -109,6 +112,24 @@ public class Resource {
     }
 
 
+    public String getIpString(){
+        if(mrData.length == 4){
+            StringBuilder stringBuilder = new StringBuilder(15);
+            return stringBuilder.append(mrData[0] & 0xFF)
+                    .append(".")
+                    .append(mrData[1] & 0xFF)
+                    .append(".")
+                    .append(mrData[2] & 0xFF)
+                    .append(".")
+                    .append(mrData[3] & 0xFF)
+                    .toString();
+        }else{
+            return "domain";
+        }
+
+
+    }
+
     @Override
     public String toString() {
         return "Resource{" +
@@ -117,9 +138,69 @@ public class Resource {
                 ", mQueryClass=" + (mQueryClass == 1 ? "IN" : "1") +
                 ", mTtl=" + mTtl +
                 ", mDataLength=" + mDataLength +
-                ", mrData=" + getFirstIp() +
+                ", mrData=" + getIpString() +
                 ", offset=" + offset +
                 ", length=" + length +
                 '}';
+    }
+
+    static final short OFFSET_DOMAIN = 0;
+    static final short OFFSET_TYPE = 2;
+    static final short OFFSET_CLASS = 4;
+    static final int OFFSET_TTL = 6;
+    static final short OFFSET_DATA_LENGTH = 10;
+    static final int OFFSET_IP = 12;
+
+    ByteBuffer mData;
+    int mDataOffset;
+
+    public Resource(byte[] data, int offset) {
+        this.mData = ByteBuffer.wrap(data);
+        this.mDataOffset = offset;
+    }
+
+    public Resource setDomain(short value) {
+        mData.putShort(mDataOffset + OFFSET_DOMAIN, value);
+        return this;
+    }
+
+    public short getType() {
+        return mData.getShort(mDataOffset + OFFSET_TYPE);
+    }
+
+    public void setType(short value) {
+        mData.putShort( mDataOffset + OFFSET_TYPE, value);
+    }
+
+    public short getClass(short value) {
+        return mData.getShort( mDataOffset + OFFSET_CLASS);
+    }
+
+    public void setClass(short value) {
+        mData.putShort( mDataOffset + OFFSET_CLASS, value);
+    }
+
+    public int getTtl() {
+        return mData.getInt(mDataOffset + OFFSET_TTL);
+    }
+
+    public void setTtl(int value) {
+        mData.putInt(mDataOffset + OFFSET_TTL, value);
+    }
+
+    public short getDataLength() {
+        return mData.getShort( mDataOffset + OFFSET_DATA_LENGTH);
+    }
+
+    public void setDataLength(short value) {
+        mData.putShort( mDataOffset + OFFSET_DATA_LENGTH, value);
+    }
+
+    public int getIp() {
+        return mData.getInt( mDataOffset + OFFSET_IP);
+    }
+
+    public void setIp(int value) {
+        mData.putInt(mDataOffset + OFFSET_IP, value);
     }
 }
