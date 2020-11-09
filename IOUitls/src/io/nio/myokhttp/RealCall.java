@@ -16,6 +16,8 @@ public class RealCall implements Call {
 
     private boolean executed;
 
+    private boolean canceled;
+
     public RealCall(HttpClient httpClient, Request request) {
         this.httpClient = httpClient;
         this.request = request;
@@ -23,7 +25,7 @@ public class RealCall implements Call {
 
     @Override
     public Request request() {
-        return null;
+        return request;
     }
 
     @Override
@@ -49,11 +51,12 @@ public class RealCall implements Call {
 
     /**
      * 拦截器执行
+     *
      * @return 结果
      */
     private Response getResponseWithInterceptorChain() throws Exception {
         List<Interceptor> interceptors = new ArrayList<>(this.httpClient.interceptorList);
-        interceptors.add(new RetryAndFollowUpInterceptor(this.httpClient,request.retryTimes()));
+        interceptors.add(new RetryAndFollowUpInterceptor(this.httpClient, request.retryTimes()));
         interceptors.add(new BridgeInterceptor());
         interceptors.add(new ConnectInterceptor(httpClient));
         interceptors.add(new CallServerInterceptor());
@@ -69,26 +72,69 @@ public class RealCall implements Call {
 
     @Override
     public void enqueue(Callback callback) {
+        synchronized (this) {
+            if (this.executed) {
+                throw new IllegalStateException("Already Executed");
+            }
 
+            this.executed = true;
+        }
+
+        this.httpClient.dispatcher().enqueue(new RealCall.AsyncCall(callback));
     }
 
     @Override
     public void cancel() {
-
+        canceled = true;
     }
 
     @Override
     public boolean isExecuted() {
-        return false;
+        return executed;
     }
 
     @Override
     public boolean isCancelled() {
-        return false;
+        return canceled;
     }
 
     @Override
     public void close() throws IOException {
+        executed = true;
+        canceled = true;
+        this.httpClient.dispatcher().finished(this);
+    }
 
+    final class AsyncCall implements Runnable {
+
+        private final Callback callback;
+
+        AsyncCall(Callback callback) {
+            this.callback = callback;
+        }
+
+        Request request(){
+            return RealCall.this.request;
+        }
+
+        RealCall get(){
+            return RealCall.this;
+        }
+
+        @Override
+        public void run() {
+            try {
+                Response response  = getResponseWithInterceptorChain();
+                if(isCancelled()){
+                    this.callback.onFailure(RealCall.this, new IOException("Canceled"));
+                }else{
+                    this.callback.onSuccess(RealCall.this, response);
+                }
+            } catch (Exception e) {
+                this.callback.onFailure(RealCall.this,e);
+            } finally {
+                RealCall.this.httpClient.dispatcher().finished(this);
+            }
+        }
     }
 }

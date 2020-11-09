@@ -51,7 +51,7 @@ public class ConnectInterceptor implements Interceptor {
         httpURLConnection.setDoInput(true);
         httpURLConnection.setDoOutput(true);
         // 是否使用缓存,没有实现缓存拦截器，默认使用原生缓存
-        httpURLConnection.setUseCaches(false);
+        httpURLConnection.setUseCaches(client.usedCache());
         // 是否允许重定向
         httpURLConnection.setInstanceFollowRedirects(true);
         Set<Map.Entry<String, String>> entries = request.headers().entrySet();

@@ -44,6 +44,21 @@ public final class Response {
         this.receivedResponseAtMillis = builder.receivedResponseAtMillis;
     }
 
+    public long requestAtMillis(){
+        return receivedResponseAtMillis - sentRequestAtMillis;
+    }
+
+    public int code(){
+        return code;
+    }
+
+    public String message(){
+        return message;
+    }
+
+    public Request request(){
+        return request;
+    }
 
     public ResponseBody body(){
         return body;

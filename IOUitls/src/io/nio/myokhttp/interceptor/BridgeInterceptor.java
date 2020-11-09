@@ -17,7 +17,6 @@ public class BridgeInterceptor implements Interceptor {
         if(body != null){
             if (body.contentType() != null) {
                 requestBuilder.addHeader("Content-Type", body.contentType().toString());
-
             }
             // HTTP中有无ContentLength都行，但是如果使用压缩比如gzip等，
             // 无法确定传递的是真正的消息长度还是压缩后的长度

@@ -41,6 +41,10 @@ public final class HttpClient {
     public static final int DEFAULT_CONNECTION_POOL_CAPABILITY = 64;
     /** 默认的http连接池的大小 */
     public static final int DEFAULT_CONNECTION_POOL_LIMIT = 64;
+    /** 连接超时时间 */
+    private static final int DEFAULT_CONNECT_TIMEOUT = 10 * 1000;
+    /** 读取数据超时时间 */
+    private static final int DEFAULT_READ_TIMEOUT = 10 * 1000;
     /**
      * 分发器
      */
@@ -62,6 +66,8 @@ public final class HttpClient {
 
     final int readTimeoutMillis;
 
+    final boolean usedCache;
+
     public HttpClient() {
         this(new Builder());
     }
@@ -82,6 +88,7 @@ public final class HttpClient {
         this.connectionPool = builder.connectionPool;
         this.readTimeoutMillis = builder.readTimeoutMillis;
         this.connectTimeoutMillis = builder.connectTimeoutMillis;
+        this.usedCache = builder.usedCache;
     }
 
     public Call newCall(Request request) {
@@ -113,6 +120,10 @@ public final class HttpClient {
         return connectTimeoutMillis;
     }
 
+    public boolean usedCache(){
+        return usedCache;
+    }
+
     public int readTimeoutMillis(){
         return readTimeoutMillis;
     }
@@ -133,10 +144,16 @@ public final class HttpClient {
 
         int readTimeoutMillis;
 
+        boolean usedCache;
+
         public Builder() {
             this.dispatcher = new Dispatcher();
-            interceptorList = new ArrayList<>();
+            this.interceptorList = new ArrayList<>();
             this.connectionPool = new ConnectionPool(DEFAULT_CONNECTION_POOL_CAPABILITY, DEFAULT_CONNECTION_POOL_LIMIT);
+            this.hostnameVerifier = HOSTNAME_VERIFIER;
+            this.x509TrustManager = TRUST_MANAGER;
+            this.connectTimeoutMillis = DEFAULT_CONNECT_TIMEOUT;
+            this.readTimeoutMillis = DEFAULT_READ_TIMEOUT;
         }
 
         public Builder interceptor(Interceptor interceptor) {
@@ -171,6 +188,11 @@ public final class HttpClient {
 
         public Builder readTimeoutMillis(int readTimeoutMillis){
             this.readTimeoutMillis = readTimeoutMillis;
+            return this;
+        }
+
+        public Builder useCache(boolean usedCache){
+            this.usedCache = usedCache;
             return this;
         }
 
